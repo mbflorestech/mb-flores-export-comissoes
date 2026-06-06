@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MB Flores — Exportar Pedidos</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Jost:wght@300;400;500&display=swap');
+    :root {
+      --green:#1e3d2b;--green-mid:#2e6644;--green-light:#4a9464;
+      --gold:#b8975a;--cream:#f7f4ee;--white:#ffffff;
+      --dark:#111714;--gray:#6b7a72;--border:#ddd8cc;--red:#a83226;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Jost',sans-serif;background:var(--cream);min-height:100vh;
+      display:flex;align-items:center;justify-content:center;padding:1.5rem}
+    body::before{content:'';position:fixed;inset:0;
+      background:radial-gradient(ellipse 60% 50% at 10% 20%,rgba(74,148,100,0.07) 0%,transparent 70%),
+                 radial-gradient(ellipse 50% 60% at 90% 80%,rgba(184,151,90,0.06) 0%,transparent 70%);
+      pointer-events:none}
+    .card{background:var(--white);border:1px solid var(--border);border-radius:20px;
+      padding:3rem 2.75rem 2.5rem;max-width:420px;width:100%;
+      box-shadow:0 8px 48px rgba(30,61,43,0.13);position:relative;
+      animation:fadeUp 0.5s ease both;text-align:center}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    .card::before{content:'';position:absolute;top:0;left:10%;right:10%;height:3px;
+      background:linear-gradient(90deg,transparent,var(--gold),transparent);border-radius:0 0 3px 3px}
+    .brand-name{font-family:'Cormorant Garamond',serif;font-size:2.4rem;font-weight:600;
+      color:var(--green);letter-spacing:0.04em;line-height:1}
+    .brand-name em{color:var(--gold);font-style:normal}
+    .brand-sub{font-size:0.7rem;letter-spacing:0.22em;text-transform:uppercase;
+      color:var(--gray);margin-top:0.4rem;margin-bottom:2rem}
+    .divider{height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);
+      margin:0 -0.5rem 2rem}
+    .desc{font-size:0.9rem;color:var(--gray);margin-bottom:2rem;line-height:1.6}
+    .desc strong{color:var(--green)}
+    .btn{width:100%;padding:1.1rem;
+      background:linear-gradient(135deg,var(--green) 0%,var(--green-mid) 100%);
+      color:var(--white);border:none;border-radius:10px;font-family:'Jost',sans-serif;
+      font-size:1rem;font-weight:500;letter-spacing:0.05em;cursor:pointer;
+      transition:opacity 0.2s,transform 0.1s,box-shadow 0.2s;
+      display:flex;align-items:center;justify-content:center;gap:0.6rem;
+      box-shadow:0 4px 16px rgba(30,61,43,0.25)}
+    .btn:hover:not(:disabled){opacity:0.92;box-shadow:0 6px 22px rgba(30,61,43,0.32)}
+    .btn:active:not(:disabled){transform:scale(0.98)}
+    .btn:disabled{opacity:0.55;cursor:not-allowed}
+    .spinner{width:18px;height:18px;border:2.5px solid rgba(255,255,255,0.35);
+      border-top-color:white;border-radius:50%;animation:spin 0.75s linear infinite;
+      display:none;flex-shrink:0}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .steps{margin-top:1.5rem;display:none;flex-direction:column;gap:0.5rem;text-align:left}
+    .steps.show{display:flex}
+    .step{display:flex;align-items:center;gap:0.75rem;font-size:0.83rem;color:var(--gray);transition:color 0.3s}
+    .step.active{color:var(--green)}.step.done{color:var(--green-light)}
+    .step-dot{width:22px;height:22px;border-radius:50%;border:2px solid var(--border);
+      display:flex;align-items:center;justify-content:center;font-size:0.7rem;
+      flex-shrink:0;transition:all 0.3s;color:var(--gray)}
+    .step.active .step-dot{border-color:var(--green-light);background:rgba(74,148,100,0.1);color:var(--green)}
+    .step.done .step-dot{border-color:var(--green-light);background:var(--green-light);color:white}
+    .progress{margin-top:1rem;height:3px;background:var(--border);border-radius:2px;overflow:hidden;display:none}
+    .progress.show{display:block}
+    .progress-fill{height:100%;background:linear-gradient(90deg,var(--green-light),var(--gold));
+      border-radius:2px;transition:width 0.5s ease;width:0%}
+    .toast{margin-top:1.25rem;padding:1rem 1.1rem;border-radius:10px;font-size:0.875rem;
+      line-height:1.6;display:none;text-align:left}
+    .toast.show{display:block}
+    .toast.success{background:#edf5f0;color:#155c2f;border:1px solid #6dbf8e}
+    .toast.error{background:#fdf0ee;color:var(--red);border:1px solid #f0b0a8}
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="brand-name">MB <em>Flores</em></div>
+  <div class="brand-sub">Exportação de Pedidos</div>
+  <div class="divider"></div>
+  <p class="desc">Gera planilha com <strong>2 abas</strong>:<br>📋 Pedidos completos · 💰 Comissões por vendedor e mês</p>
+
+  <button class="btn" id="btn" onclick="exportar()">
+    <span id="btnIcon">📊</span>
+    <span id="btnText">Baixar Planilha de Pedidos</span>
+    <div class="spinner" id="spinner"></div>
+  </button>
+
+  <div class="progress" id="progress">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+
+  <div class="steps" id="steps">
+    <div class="step" id="step1"><div class="step-dot" id="dot1">1</div><span>Buscando pedidos no Airtable...</span></div>
+    <div class="step" id="step2"><div class="step-dot" id="dot2">2</div><span>Gerando aba de Pedidos...</span></div>
+    <div class="step" id="step3"><div class="step-dot" id="dot3">3</div><span>Gerando aba de Comissões...</span></div>
+    <div class="step" id="step4"><div class="step-dot" id="dot4">4</div><span>Baixando arquivo...</span></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+  const AIRTABLE_TOKEN = 'patOgfVPRLsnmQdAo.ad07e86b410af65b6049d0086f53547ff041f713d96517d303b93032336ecd45';
+  const BASE_ID        = 'appE7Y2kABDmDgYYn';
+  const TABLE_ID       = 'tblsEqDfZrsOeI3H0';
+
+  const COLUNAS_PEDIDOS = [
+    'Número do Pedido','Vendedor','Nome do Cliente','Data do Pedido',
+    'CPF/CNPJ (from Clientes)','Telefone','E-mail',
+    'Nome do Falecido','Data de Sepultamento',
+    'Produto 1','Quantidade 1','Desconto 1 (R$)','Valor Total Item 1 (R$) (Manual)','Mensagem 1',
+    'Produto 2','Quantidade 2','Desconto 2 (R$)','Valor Total Item 2 (R$) (Manual)','Mensagem 2',
+    'Produto 3','Quantidade 3','Desconto 3 (R$)','Valor Total Item 3 (R$) (Manual)','Mensagem 3',
+    'Produto 4','Quantidade 4','Desconto 4 (R$)','Valor Total Item 4 (R$) (Manual)','Mensagem 4',
+    'Produto 5','Quantidade 5','Desconto 5 (R$)','Valor Total Item 5 (R$) (Manual)','Mensagem 5',
+    'Total do Pedido (R$) (Manual)','Valor de Comissão por Venda (R$)',
+    'Forma de Pagamento','Pedido Pago?','Formato do Comprovante',
+    'Urgência do Pedido','Data e Hora de Entrega','Endereço de Entrega',
+    'Sala / Complemento','Observações Gerais do Pedido',
+    'Status do Pedido','Motivo do Cancelamento','Total de Produtos',
+  ];
+
+  const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                 'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  // Estilos
+  const S = {
+    cabecalho: { font:{bold:true,color:{rgb:'FFFFFF'},sz:11}, fill:{fgColor:{rgb:'1e3d2b'}}, alignment:{horizontal:'center',vertical:'center'}, border:{bottom:{style:'medium',color:{rgb:'b8975a'}}} },
+    cabecalhoGold: { font:{bold:true,color:{rgb:'FFFFFF'},sz:11}, fill:{fgColor:{rgb:'b8975a'}}, alignment:{horizontal:'center',vertical:'center'} },
+    vendedor: { font:{bold:true,sz:11,color:{rgb:'1e3d2b'}}, fill:{fgColor:{rgb:'edf5f0'}}, border:{bottom:{style:'thin',color:{rgb:'ddd8cc'}}} },
+    mes: { font:{bold:true,sz:10,color:{rgb:'2e6644'}}, fill:{fgColor:{rgb:'f7f4ee'}}, alignment:{horizontal:'left'} },
+    valor: { numFmt:'R$ #,##0.00', alignment:{horizontal:'right'} },
+    valorBold: { font:{bold:true}, numFmt:'R$ #,##0.00', alignment:{horizontal:'right'} },
+    totalGeral: { font:{bold:true,sz:12,color:{rgb:'FFFFFF'}}, fill:{fgColor:{rgb:'1e3d2b'}}, numFmt:'R$ #,##0.00', alignment:{horizontal:'right'} },
+    totalGeralLabel: { font:{bold:true,sz:12,color:{rgb:'FFFFFF'}}, fill:{fgColor:{rgb:'1e3d2b'}}, alignment:{horizontal:'left'} },
+    subtotal: { font:{bold:true}, fill:{fgColor:{rgb:'e8f4ed'}}, numFmt:'R$ #,##0.00', alignment:{horizontal:'right'} },
+    subtotalLabel: { font:{bold:true}, fill:{fgColor:{rgb:'e8f4ed'}}, alignment:{horizontal:'left'} },
+  };
+
+  function cel(v, s) { return { v, s, t: typeof v === 'number' ? 'n' : 's' }; }
+  function enc(r, c)  { return XLSX.utils.encode_cell({r, c}); }
+
+  function setLoading(on) {
+    document.getElementById('btn').disabled = on;
+    document.getElementById('btnIcon').style.display = on ? 'none' : 'inline';
+    document.getElementById('spinner').style.display = on ? 'block' : 'none';
+    document.getElementById('btnText').textContent = on ? 'Processando...' : 'Baixar Planilha de Pedidos';
+  }
+  function setProgress(pct) {
+    document.getElementById('progress').classList.add('show');
+    document.getElementById('progressFill').style.width = pct + '%';
+  }
+  function activateStep(n) {
+    for (let i = 1; i <= 4; i++) {
+      const s = document.getElementById(`step${i}`);
+      const d = document.getElementById(`dot${i}`);
+      s.className = 'step' + (i < n ? ' done' : i === n ? ' active' : '');
+      d.textContent = i < n ? '✓' : i;
+    }
+  }
+  function showToast(html, type) {
+    const el = document.getElementById('toast');
+    el.innerHTML = html;
+    el.className = `toast show ${type}`;
+  }
+  function getValor(record, campo) {
+    const v = record.fields[campo];
+    if (v === undefined || v === null) return '';
+    if (Array.isArray(v)) return v.map(i => typeof i === 'object' ? (i.name||i.text||i.value||'') : i).join(', ');
+    if (typeof v === 'object') return v.name || v.email || v.text || '';
+    return String(v);
+  }
+  function parseValor(str) {
+    if (!str) return 0;
+    return parseFloat(String(str).replace(/[R$\s.]/g,'').replace(',','.')) || 0;
+  }
+  function parseMesAno(dataStr) {
+    if (!dataStr) return null;
+    // Formato pode ser MM/DD/YYYY, YYYY-MM-DD ou DD/MM/YYYY
+    let d = new Date(dataStr);
+    if (isNaN(d.getTime())) {
+      const parts = dataStr.split('/');
+      if (parts.length === 3) d = new Date(parts[2], parts[1]-1, parts[0]);
+    }
+    if (isNaN(d.getTime())) return null;
+    return { mes: d.getMonth(), ano: d.getFullYear(), label: `${MESES[d.getMonth()]} / ${d.getFullYear()}` };
+  }
+
+  // ── ABA 1: PEDIDOS ────────────────────────────────────────────────────────────
+  function gerarAbaPedidos(records) {
+    const ws = {};
+    const range = { s:{r:0,c:0}, e:{r:records.length,c:COLUNAS_PEDIDOS.length-1} };
+
+    // Cabeçalho
+    COLUNAS_PEDIDOS.forEach((col, c) => {
+      ws[enc(0,c)] = cel(col, S.cabecalho);
+    });
+
+    // Dados
+    records.forEach((record, ri) => {
+      COLUNAS_PEDIDOS.forEach((col, c) => {
+        ws[enc(ri+1,c)] = { v: getValor(record, col), t:'s' };
+      });
+    });
+
+    ws['!ref'] = XLSX.utils.encode_range(range);
+    ws['!cols'] = COLUNAS_PEDIDOS.map(col => ({ wch: Math.max(col.length+2, 16) }));
+    ws['!rows'] = [{ hpt: 22 }];
+    ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+    return ws;
+  }
+
+  // ── ABA 2: COMISSÕES ──────────────────────────────────────────────────────────
+  function gerarAbaComissoes(records) {
+    const ws = {};
+
+    // Agrupa por vendedor → mês
+    const porVendedor = {};
+    let totalGeral = 0;
+    const porMes = {};
+
+    records.forEach(r => {
+      const vendedor  = getValor(r, 'Vendedor') || '(sem vendedor)';
+      const comissao  = parseValor(getValor(r, 'Valor de Comissão por Venda (R$)'));
+      const dataStr   = getValor(r, 'Data do Pedido');
+      const mesAno    = parseMesAno(dataStr);
+      const mesLabel  = mesAno ? mesAno.label : 'Sem data';
+      const mesKey    = mesAno ? `${mesAno.ano}-${String(mesAno.mes).padStart(2,'0')}` : 'z-sem-data';
+
+      if (!porVendedor[vendedor]) porVendedor[vendedor] = { total:0, meses:{} };
+      porVendedor[vendedor].total += comissao;
+      porVendedor[vendedor].meses[mesKey] = porVendedor[vendedor].meses[mesKey] || { label: mesLabel, valor: 0 };
+      porVendedor[vendedor].meses[mesKey].valor += comissao;
+
+      totalGeral += comissao;
+      porMes[mesKey] = porMes[mesKey] || { label: mesLabel, valor: 0 };
+      porMes[mesKey].valor += comissao;
+    });
+
+    let row = 0;
+
+    // ── TÍTULO ──
+    ws[enc(row,0)] = cel('💰 RELATÓRIO DE COMISSÕES — MB FLORES', { font:{bold:true,sz:14,color:{rgb:'1e3d2b'}}, alignment:{horizontal:'left'} });
+    ws[enc(row,1)] = cel('', {});
+    ws[enc(row,2)] = cel('', {});
+    row += 2;
+
+    // ── SEÇÃO 1: POR VENDEDOR ──
+    ws[enc(row,0)] = cel('COMISSÕES POR VENDEDOR', S.cabecalho);
+    ws[enc(row,1)] = cel('TOTAL COMISSÃO', S.cabecalho);
+    row++;
+
+    const vendedores = Object.keys(porVendedor).sort();
+    vendedores.forEach(v => {
+      const vd = porVendedor[v];
+
+      // Linha do vendedor
+      ws[enc(row,0)] = cel(v, S.vendedor);
+      ws[enc(row,1)] = cel(vd.total, S.subtotal);
+      row++;
+
+      // Linhas por mês do vendedor
+      const mesesOrdenados = Object.keys(vd.meses).sort();
+      mesesOrdenados.forEach(mk => {
+        const m = vd.meses[mk];
+        ws[enc(row,0)] = cel(`   ${m.label}`, S.mes);
+        ws[enc(row,1)] = cel(m.valor, S.valor);
+        row++;
+      });
+    });
+
+    // Total geral por vendedor
+    ws[enc(row,0)] = cel('TOTAL GERAL', S.totalGeralLabel);
+    ws[enc(row,1)] = cel(totalGeral, S.totalGeral);
+    row += 2;
+
+    // ── SEÇÃO 2: POR MÊS ──
+    ws[enc(row,0)] = cel('COMISSÕES POR MÊS', S.cabecalhoGold);
+    ws[enc(row,1)] = cel('TOTAL COMISSÃO', S.cabecalhoGold);
+    row++;
+
+    const mesesGlobais = Object.keys(porMes).sort();
+    mesesGlobais.forEach(mk => {
+      const m = porMes[mk];
+      ws[enc(row,0)] = cel(m.label, S.mes);
+      ws[enc(row,1)] = cel(m.valor, S.valor);
+      row++;
+    });
+
+    // Total geral por mês
+    ws[enc(row,0)] = cel('TOTAL GERAL', S.totalGeralLabel);
+    ws[enc(row,1)] = cel(totalGeral, S.totalGeral);
+
+    ws['!ref'] = XLSX.utils.encode_range({ s:{r:0,c:0}, e:{r:row,c:2} });
+    ws['!cols'] = [{ wch: 38 }, { wch: 22 }, { wch: 16 }];
+    ws['!merges'] = [
+      { s:{r:0,c:0}, e:{r:0,c:2} }, // título
+    ];
+
+    return ws;
+  }
+
+  // ── EXPORT PRINCIPAL ──────────────────────────────────────────────────────────
+  async function exportar() {
+    setLoading(true);
+    document.getElementById('steps').className = 'steps show';
+    setProgress(5);
+    activateStep(1);
+
+    const allRecords = [];
+    let offset = null;
+    let page = 0;
+
+    try {
+      // ETAPA 1 — Buscar registros
+      do {
+        page++;
+        let url = `https://api.airtable.com/v0/${BASE_ID}/${TABLE_ID}?pageSize=100`;
+        if (offset) url += `&offset=${encodeURIComponent(offset)}`;
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` } });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error?.message || `Erro HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        allRecords.push(...data.records);
+        offset = data.offset || null;
+        setProgress(Math.min(5 + page * 10, 45));
+      } while (offset);
+
+      // ETAPA 2 — Aba Pedidos
+      activateStep(2);
+      setProgress(60);
+      const wsPedidos = gerarAbaPedidos(allRecords);
+
+      // ETAPA 3 — Aba Comissões
+      activateStep(3);
+      setProgress(80);
+      const wsComissoes = gerarAbaComissoes(allRecords);
+
+      // ETAPA 4 — Download
+      activateStep(4);
+      setProgress(92);
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, wsPedidos,   '📋 Pedidos');
+      XLSX.utils.book_append_sheet(wb, wsComissoes, '💰 Comissões');
+
+      const hoje = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
+      XLSX.writeFile(wb, `MB_Flores_Pedidos_${hoje}.xlsx`);
+
+      setProgress(100);
+      setLoading(false);
+      showToast(
+        `✅ <strong>Download concluído!</strong><br>
+         <strong>${allRecords.length} pedidos</strong> exportados em 2 abas:<br>
+         📋 Pedidos completos · 💰 Comissões por vendedor e mês`,
+        'success'
+      );
+
+    } catch (err) {
+      setLoading(false);
+      showToast(`❌ ${err.message}`, 'error');
+      console.error(err);
+    }
+  }
+</script>
+</body>
+</html>
