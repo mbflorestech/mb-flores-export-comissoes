@@ -102,7 +102,7 @@
   const TABLE_ID       = 'tblsEqDfZrsOeI3H0';
 
   const COLUNAS_PEDIDOS = [
-    'Número do Pedido','Vendedor','Nome do Cliente','Data do Pedido',
+    'Número do Pedido','Nome do vendedor','Nome do Cliente','Data do Pedido',
     'CPF/CNPJ (from Clientes)','Telefone','E-mail',
     'Nome do Falecido','Data de Sepultamento',
     'Produto 1','Quantidade 1','Desconto 1 (R$)','Valor Total Item 1 (R$) (Manual)','Mensagem 1',
@@ -163,7 +163,7 @@
   function getValor(record, campo) {
     const v = record.fields[campo];
     if (v === undefined || v === null) return '';
-    if (Array.isArray(v)) return v.map(i => typeof i === 'object' ? (i.name||i.text||i.value||'') : i).join(', ');
+    if (Array.isArray(v)) { const f = v[0]; if (f === null || f === undefined) return ''; return typeof f === 'object' ? (f.name||f.text||f.value||f.id||'') : String(f); }
     if (typeof v === 'object') return v.name || v.email || v.text || '';
     return String(v);
   }
@@ -217,7 +217,7 @@
     const porMes = {};
 
     records.forEach(r => {
-      const vendedor  = getValor(r, 'Vendedor') || '(sem vendedor)';
+      const vendedor  = getValor(r, 'Nome do vendedor') || '(sem vendedor)';
       const comissao  = parseValor(getValor(r, 'Valor de Comissão por Venda (R$)'));
       const dataStr   = getValor(r, 'Data do Pedido');
       const mesAno    = parseMesAno(dataStr);
